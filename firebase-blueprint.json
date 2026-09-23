@@ -1,0 +1,368 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "Stores user profile, authentication details, gaming preferences, and server-verified premium subscription status.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique identifier of the user matching request.auth.uid",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name from Google Auth or custom input",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google user email",
+          "maxLength": 150
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar photo URL from Google Auth",
+          "maxLength": 500
+        },
+        "telegramHandle": {
+          "type": "string",
+          "description": "Optional connected Telegram handle",
+          "maxLength": 60,
+          "pattern": "^@?[a-zA-Z0-9_]{3,32}$"
+        },
+        "preferredGames": {
+          "type": "string",
+          "description": "Comma-separated list of games played (e.g. Free Fire, BGMI)",
+          "maxLength": 200
+        },
+        "selectedEmotion": {
+          "type": "string",
+          "description": "User's favorite POPI emotion state",
+          "enum": ["idle", "happy", "gaming", "thinking", "victory", "sleepy"]
+        },
+        "isBanned": {
+          "type": "boolean",
+          "description": "Admin-controlled flag indicating whether the user account has been suspended or banned."
+        },
+        "banReason": {
+          "type": "string",
+          "description": "Reason provided by administrator for account suspension.",
+          "maxLength": 255
+        },
+        "bannedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user account was banned"
+        },
+        "premiumStatus": {
+          "type": "string",
+          "description": "Server-controlled subscription status. Locked from client-side manipulation.",
+          "enum": ["free", "active", "expired"]
+        },
+        "subscriptionExpiry": {
+          "type": "number",
+          "description": "Server-controlled subscription expiration timestamp in milliseconds. Locked from client-side manipulation."
+        },
+        "expiry": {
+          "type": "number",
+          "description": "Unix timestamp representation of expiration date for cross-compatibility."
+        },
+        "tier": {
+          "type": "string",
+          "description": "Subscription tier level",
+          "enum": ["FREE", "PREMIUM"]
+        },
+        "orderId": {
+          "type": "string",
+          "description": "Verified FamGateway order reference",
+          "maxLength": 64
+        },
+        "utr": {
+          "type": "string",
+          "description": "Verified NPCI bank UTR string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user account was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user account was last updated"
+        }
+      },
+      "required": ["uid", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "gameNote": {
+      "title": "GameNote",
+      "description": "User notes, strategies, or saved tips for gaming tools.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique note identifier",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Note or strategy title",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "game": {
+          "type": "string",
+          "description": "Associated game name",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "content": {
+          "type": "string",
+          "description": "Details or tips",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "userId", "title", "game", "content", "createdAt", "updatedAt"]
+    },
+    "boostSession": {
+      "title": "BoostSession",
+      "description": "Logs for user latency optimization and boost sessions.",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "Unique session identifier",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Boost profile or channel mode",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Session creation timestamp"
+        }
+      },
+      "required": ["sessionId", "userId", "mode", "createdAt"]
+    },
+    "subscriptionPlan": {
+      "title": "SubscriptionPlan",
+      "description": "Subscription pricing plan configuration stored in database and manageable by admins.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique plan ID (e.g. free, weekly, monthly, yearly)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of plan"
+        },
+        "tagline": {
+          "type": "string",
+          "description": "Plan promotional tagline"
+        },
+        "priceInr": {
+          "type": "number",
+          "description": "Live price in Indian Rupees (INR)"
+        },
+        "durationDays": {
+          "type": "number",
+          "description": "Access duration in days"
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["FREE", "PREMIUM"],
+          "description": "Subscription tier"
+        },
+        "popular": {
+          "type": "boolean",
+          "description": "Badge flag for Most Popular"
+        },
+        "bestValue": {
+          "type": "boolean",
+          "description": "Badge flag for Best Value"
+        },
+        "features": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of included features"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of last modification"
+        }
+      },
+      "required": ["id", "name", "priceInr", "durationDays", "tier"]
+    },
+    "realtimeRound": {
+      "title": "RealtimeRound",
+      "description": "Live real-time game round result broadcast via Firestore.",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "Game mode key (30s, 1m, 3m, 5m)"
+        },
+        "roundNumber": {
+          "type": "string",
+          "description": "Latest round identifier"
+        },
+        "winningNumber": {
+          "type": "number",
+          "description": "Winning single-digit number (0-9)"
+        },
+        "winningColor": {
+          "type": "string",
+          "enum": ["red", "green", "violet"],
+          "description": "Winning color classification"
+        },
+        "size": {
+          "type": "string",
+          "enum": ["Big", "Small"],
+          "description": "Big (5-9) or Small (0-4) indicator"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Round result epoch timestamp in ms"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Round broadcast timestamp"
+        }
+      },
+      "required": ["mode", "roundNumber", "winningNumber", "winningColor", "size"]
+    },
+    "realtimeChatMessage": {
+      "title": "RealtimeChatMessage",
+      "description": "Live real-time gamer prediction message or chat in the community lounge.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique message ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Author user ID"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Gamer alias or display name"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Optional avatar URL"
+        },
+        "message": {
+          "type": "string",
+          "description": "Chat or prediction content",
+          "maxLength": 300
+        },
+        "badge": {
+          "type": "string",
+          "description": "User clearance badge (e.g. VIP, PRO, ADMIN, EXPLORER)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Message timestamp"
+        }
+      },
+      "required": ["id", "userId", "userName", "message", "timestamp"]
+    },
+    "realtimePresence": {
+      "title": "RealtimePresence",
+      "description": "Real-time presence tracking of active online players.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique user ID"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Player name"
+        },
+        "activeGame": {
+          "type": "string",
+          "description": "Current active mode or page"
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Heartbeat timestamp"
+        }
+      },
+      "required": ["userId", "userName", "lastSeen"]
+    }
+  },
+  "firestore": {
+    "/subscription_plans/{planId}": {
+      "schema": "subscriptionPlan",
+      "description": "Stores live subscription pricing plans editable by admin and saved in database."
+    },
+    "/realtime_rounds/{mode}": {
+      "schema": "realtimeRound",
+      "description": "Stores real-time live round feeds synchronized across all connected players."
+    },
+    "/realtime_chat/{messageId}": {
+      "schema": "realtimeChatMessage",
+      "description": "Stores real-time player community messages and live prediction signals."
+    },
+    "/realtime_presence/{userId}": {
+      "schema": "realtimePresence",
+      "description": "Stores active online players presence heartbeat."
+    },
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Stores user profile, preferences, and server-locked subscription state."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "gameNote",
+      "description": "Stores personalized game strategies and notes."
+    },
+    "/users/{userId}/boost_sessions/{sessionId}": {
+      "schema": "boostSession",
+      "description": "Stores boost session optimization records."
+    }
+  }
+}

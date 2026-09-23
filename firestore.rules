@@ -1,0 +1,118 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if the user is signed in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Verify if user UID or email is in authorized admin list
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.uid == 'AvYPl0R4CGZfc0zZQGrrKIiRhuI2' ||
+        request.auth.uid == 'aT1NvMLjfsNi9DgYp4wuJxrGnoQ2' ||
+        request.auth.uid == 'Kcctay6qczLlEwBZNcpk98cuN5u2' ||
+        request.auth.uid == 'TtzyhcKW0NMOCITp4DEsbfrk4h73' ||
+        request.auth.token.email == 'subhojitbhandari2021@gmail.com' ||
+        request.auth.token.email == 'titnesgamer@gmail.com' ||
+        request.auth.token.email == 'mrtitnes@gmail.com'
+      );
+    }
+
+    // Helper: Verify document ownership
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper: Checks if client is attempting to alter locked payment, subscription or moderation fields
+    function isModifyingPaymentFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'premiumStatus',
+        'subscriptionExpiry',
+        'expiry',
+        'tier',
+        'orderId',
+        'utr',
+        'paymentInfo',
+        'isBanned',
+        'banReason',
+        'bannedAt'
+      ]);
+    }
+
+    // User profile documents:
+    // 1. Only authenticated owners and admins can read their own data (another person cannot read).
+    // 2. Client-side users are strictly locked from setting or modifying payment-related fields
+    //    (premiumStatus, subscriptionExpiry, expiry, tier, etc.), even when logged in.
+    // 3. Only server-side processes or authorized admins can write payment-related fields.
+    // 4. Deletion allowed for owner or admin (used when subscriptions expire or account is purged).
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      // On create: Client cannot initialize active premium status or future expiry dates
+      allow create: if (isOwner(userId) && (
+        !('premiumStatus' in request.resource.data) || request.resource.data.premiumStatus == 'free'
+      ) && (
+        !('subscriptionExpiry' in request.resource.data)
+      ) && (
+        !('expiry' in request.resource.data)
+      ) && (
+        !('tier' in request.resource.data) || request.resource.data.tier == 'FREE'
+      )) || isAdmin();
+
+      // On update: Client cannot modify premiumStatus, subscriptionExpiry, or expiry
+      allow update: if (isOwner(userId) && !isModifyingPaymentFields()) || isAdmin();
+
+      // On delete: Allowed for owner or admin (e.g. data cleanup when subscription expires)
+      allow delete: if isOwner(userId) || isAdmin();
+
+      // Boost session logs: Strictly isolated to owner and admins
+      match /boost_sessions/{sessionId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // Game notes & strategies: Strictly isolated to owner and admins
+      match /notes/{noteId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Subscription Plans: Anyone can view live plans and prices.
+    // ONLY verified administrators can create, update, or delete pricing in the database!
+    match /subscription_plans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Realtime Game Rounds: Anyone can read live game rounds
+    match /realtime_rounds/{mode} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Realtime Community Chat & Prediction Signals:
+    match /realtime_chat/{messageId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Realtime Player Presence:
+    match /realtime_presence/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // Global rule:
+    // Unauthenticated persons cannot read. Read is only permitted when user is logged in.
+    // Root-level write/edit/delete is restricted ONLY to authorized admins.
+    match /{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

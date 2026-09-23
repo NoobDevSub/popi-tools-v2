@@ -1,0 +1,84 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+        "profile": {
+          // Users can write their profile displayName and photoURL, but cannot modify their role or status
+          ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+          ".validate": "newData.hasChildren(['uid', 'email', 'displayName']) && (!data.exists() || (newData.child('role').val() === data.child('role').val() && newData.child('status').val() === data.child('status').val()) || auth.token.email === 'titnesgamer@gmail.com')"
+        },
+        "plan": {
+          // Plan is read-only for client; only backend / admin can modify plan
+          ".write": "auth != null && auth.token.email === 'titnesgamer@gmail.com'"
+        },
+        "usage": {
+          // Usage upload counter
+          ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')"
+        },
+        "settings": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+    "apiKeys": {
+      "$uid": {
+        // Users can only view and manage their own API keys
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+        "$keyId": {
+          ".validate": "newData.hasChildren(['id', 'uid', 'maskedKey', 'status']) && newData.child('uid').val() === auth.uid"
+        }
+      }
+    },
+    "subscriptions": {
+      "$uid": {
+        // Users can read their own subscription; only trusted payment webhook or admin can write
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+        ".write": "auth != null && auth.token.email === 'titnesgamer@gmail.com'"
+      }
+    },
+    "uploads": {
+      "$uid": {
+        // Script uploads metadata strictly isolated to the authenticated owner
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')",
+        "$uploadId": {
+          ".validate": "newData.hasChildren(['uploadId', 'uid', 'fileName']) && newData.child('uid').val() === auth.uid"
+        }
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'titnesgamer@gmail.com')"
+      }
+    },
+    "feedback": {
+      ".read": "auth != null && auth.token.email === 'titnesgamer@gmail.com'",
+      "$feedbackId": {
+        // Any authenticated user can submit feedback
+        ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid"
+      }
+    },
+    "rounds": {
+      // Game draw broadcasts are readable by everyone, writable by admin/authenticated workers
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "chat": {
+      // Real-time lounge chat readable by everyone, messages created by authenticated users
+      ".read": true,
+      "$messageId": {
+        ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || auth.token.email === 'titnesgamer@gmail.com')"
+      }
+    },
+    "presence": {
+      // Active player presence
+      ".read": true,
+      "$userId": {
+        ".write": "auth != null && ($userId === auth.uid || auth.token.email === 'titnesgamer@gmail.com')"
+      }
+    }
+  }
+}

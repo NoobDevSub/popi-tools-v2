@@ -1,0 +1,6 @@
+{
+  "name": "POPI",
+  "description": "Your AI-powered gaming companion featuring real-time interactive face tracking, 38+ expressive and hidden moods, and an automatic mood switcher engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

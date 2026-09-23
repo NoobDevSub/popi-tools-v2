@@ -1,0 +1,165 @@
+{
+  "users": {
+    "AvYPl0R4CGZfc0zZQGrrKIiRhuI2": {
+      "uid": "AvYPl0R4CGZfc0zZQGrrKIiRhuI2",
+      "displayName": "Subhojit Bhandari (Lead Admin)",
+      "email": "subhojitbhandari2021@gmail.com",
+      "role": "admin",
+      "isBanned": false,
+      "createdAt": "2026-01-15T10:00:00.000Z",
+      "lastActive": "2026-09-23T12:20:12.121Z",
+      "planId": "lifetime_admin",
+      "tier": "PREMIUM",
+      "subscriptionExpiry": 4102444800000,
+      "expiry": 4102444800000,
+      "premiumStatus": "active",
+      "region": "India (Kolkata)",
+      "notesCount": 14,
+      "boostSessionsCount": 52,
+      "orderId": "ADMIN_ROOT_PERMIT",
+      "utr": "NPCI_ADMIN_SUPER_KEY"
+    },
+    "aT1NvMLjfsNi9DgYp4wuJxrGnoQ2": {
+      "uid": "aT1NvMLjfsNi9DgYp4wuJxrGnoQ2",
+      "displayName": "POPI Core Admin 2",
+      "email": "admin2@popitools.ai",
+      "role": "admin",
+      "isBanned": false,
+      "createdAt": "2026-01-18T12:00:00.000Z",
+      "lastActive": "2026-09-23T12:20:12.122Z",
+      "planId": "lifetime_admin",
+      "tier": "PREMIUM",
+      "subscriptionExpiry": 4102444800000,
+      "expiry": 4102444800000,
+      "premiumStatus": "active",
+      "region": "India (Mumbai)",
+      "notesCount": 8,
+      "boostSessionsCount": 29,
+      "orderId": "ADMIN_ROOT_PERMIT",
+      "utr": "NPCI_ADMIN_SUPER_KEY"
+    },
+    "usr_pro_gamer_99": {
+      "uid": "usr_pro_gamer_99",
+      "displayName": "Aakash 'Predator' Sharma",
+      "email": "aakash.sharma.gaming@gmail.com",
+      "role": "user",
+      "isBanned": false,
+      "createdAt": "2026-03-01T08:30:00.000Z",
+      "lastActive": "2026-09-23T10:20:12.122Z",
+      "planId": "monthly",
+      "tier": "PREMIUM",
+      "subscriptionExpiry": 1792066812122,
+      "expiry": 1792066812122,
+      "premiumStatus": "active",
+      "orderId": "fg_ORDER_892301",
+      "utr": "408923091823",
+      "region": "India (Delhi)",
+      "notesCount": 5,
+      "boostSessionsCount": 38
+    },
+    "usr_bgmi_legend": {
+      "uid": "usr_bgmi_legend",
+      "displayName": "Rohan Varma",
+      "email": "rohan.bgmi.esports@gmail.com",
+      "role": "user",
+      "isBanned": false,
+      "createdAt": "2026-03-10T14:15:00.000Z",
+      "lastActive": "2026-09-23T07:20:12.122Z",
+      "planId": "weekly",
+      "tier": "PREMIUM",
+      "subscriptionExpiry": 1790511612122,
+      "expiry": 1790511612122,
+      "premiumStatus": "active",
+      "orderId": "fg_ORDER_910244",
+      "utr": "409102449012",
+      "region": "India (Bengaluru)",
+      "notesCount": 3,
+      "boostSessionsCount": 17
+    },
+    "usr_suspicious_bot": {
+      "uid": "usr_suspicious_bot",
+      "displayName": "SpeedScraper_Bot_84",
+      "email": "bot_user84@temporary-mail.org",
+      "role": "user",
+      "isBanned": true,
+      "banReason": "Automated scraping and rapid-fire API request abuse",
+      "bannedAt": "2026-03-20T11:45:00.000Z",
+      "createdAt": "2026-03-19T10:00:00.000Z",
+      "lastActive": "2026-03-20T11:45:00.000Z",
+      "planId": "free",
+      "tier": "FREE",
+      "subscriptionExpiry": 0,
+      "expiry": 0,
+      "premiumStatus": "free",
+      "region": "Unknown (Proxy)",
+      "notesCount": 0,
+      "boostSessionsCount": 1
+    }
+  },
+  "events": [],
+  "gaMeasurementId": "G-POPI2026IN",
+  "plans": {
+    "free": {
+      "id": "free",
+      "name": "Free Explorer",
+      "tagline": "Essential results viewing for casual exploration",
+      "priceInr": 0,
+      "durationDays": 3650,
+      "tier": "FREE",
+      "features": [
+        "Live 30s & 1m result channels",
+        "Basic Big/Small historical classification",
+        "Last 25 results rolling window",
+        "Standard telemetry tracking"
+      ]
+    },
+    "weekly": {
+      "id": "weekly",
+      "name": "Weekly Pass",
+      "tagline": "Flexible short-term tactical gaming analytical pass",
+      "priceInr": 149,
+      "durationDays": 7,
+      "tier": "PREMIUM",
+      "features": [
+        "7 Days full analytical access",
+        "100-round historical rolling window",
+        "Complete 0–9 number frequency bars",
+        "Streak & parity distribution charts",
+        "CSV audit log export"
+      ]
+    },
+    "monthly": {
+      "id": "monthly",
+      "name": "Monthly VIP",
+      "tagline": "Uncapped access to 100-round windows & streak metrics",
+      "priceInr": 499,
+      "durationDays": 30,
+      "tier": "PREMIUM",
+      "popular": true,
+      "features": [
+        "30 Days VIP gaming suite clearance",
+        "Full 100+ rounds rolling sample analysis",
+        "Streak & sequence telemetry alerts",
+        "Interactive POPI companion VIP moods",
+        "One-click CSV historical data export",
+        "Priority Indian support desk assistance"
+      ]
+    },
+    "yearly": {
+      "id": "yearly",
+      "name": "Yearly Elite",
+      "tagline": "Maximum value for serious analytical gamers",
+      "priceInr": 4999,
+      "durationDays": 365,
+      "tier": "PREMIUM",
+      "bestValue": true,
+      "features": [
+        "365 Days complete VIP clearance",
+        "All future tool releases & analytical upgrades",
+        "Priority API queue for instant settlements",
+        "Dedicated VIP support desk access",
+        "Exclusive gamer badge in community"
+      ]
+    }
+  }
+}
