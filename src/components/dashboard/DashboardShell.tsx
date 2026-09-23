@@ -357,7 +357,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="min-h-screen w-full flex bg-slate-900/5 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Rajdhani',sans-serif] selection:bg-[#FF4625] selection:text-white">
+    <div className="min-h-screen w-full flex bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-[#FF4625] selection:text-white">
       {/* 1. Left Sidebar (Desktop & Mobile Drawer) */}
       <Sidebar
         activePage={activePage}

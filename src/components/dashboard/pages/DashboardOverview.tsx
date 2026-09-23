@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   GameMode,
   HistoricalResult,
@@ -25,12 +25,22 @@ import {
   UploadCloud,
   UserCheck,
   CreditCard,
+  Search,
+  Filter,
+  Download,
+  SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Check,
+  MoreVertical,
+  Scale,
+  Palette,
+  Target,
 } from "lucide-react";
 import { DashboardPage } from "../Sidebar";
 import { useAuth } from "../../../context/AuthContext";
 import {
-  subscribeToUserUsage,
-  subscribeToApiKeys,
   POPI_PLANS,
   type UserUsageData,
   type ApiKeyRecord,
@@ -64,660 +74,803 @@ export function DashboardOverview({
   const latestResult = results[0];
   const countdown = getNextRoundCountdown(selectedMode);
 
-  const [usage, setUsage] = useState<UserUsageData>({
-    uploadCount: 0,
-    remainingUploads: 4,
-    lastUploadReset: new Date().toISOString(),
-  });
-  const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
+  // Table filtering and pagination states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSizeFilter, setSelectedSizeFilter] = useState<"ALL" | "Big" | "Small">("ALL");
+  const [selectedColorFilter, setSelectedColorFilter] = useState<"ALL" | "Red" | "Green" | "Violet">("ALL");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [copiedRoundId, setCopiedRoundId] = useState<string | null>(null);
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 
   const rawPlan = (profile as any)?.plan || (profile as any)?.subscriptionPlan || "free";
   const planKey = (rawPlan.toLowerCase() as PopiPlanType) in POPI_PLANS ? (rawPlan.toLowerCase() as PopiPlanType) : "free";
   const planInfo = POPI_PLANS[planKey] || POPI_PLANS.free;
-  const weeklyQuota = isAdmin ? 9999 : planInfo.uploadsPerWeek;
 
-  useEffect(() => {
-    if (!user?.uid) return;
-    const unsubUsage = subscribeToUserUsage(user.uid, (u: UserUsageData) => setUsage(u));
-    const unsubKeys = subscribeToApiKeys(user.uid, (keys: ApiKeyRecord[]) => setApiKeys(keys));
-    return () => {
-      unsubUsage();
-      unsubKeys();
-    };
-  }, [user?.uid]);
+  // Filter & sort results for the table
+  const filteredResults = useMemo(() => {
+    return results.filter((item) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesIssue = item.roundId.toLowerCase().includes(q);
+        const matchesNum = item.number.toString() === q;
+        if (!matchesIssue && !matchesNum) return false;
+      }
+      if (selectedSizeFilter !== "ALL" && item.size !== selectedSizeFilter) {
+        return false;
+      }
+      if (selectedColorFilter !== "ALL") {
+        if (selectedColorFilter === "Violet" && !item.color.toLowerCase().includes("violet")) {
+          return false;
+        }
+        if (selectedColorFilter === "Red" && !item.color.toLowerCase().includes("red")) {
+          return false;
+        }
+        if (selectedColorFilter === "Green" && !item.color.toLowerCase().includes("green")) {
+          return false;
+        }
+      }
+      return true;
+    }).sort((a, b) => {
+      if (sortOrder === "asc") {
+        return a.roundId.localeCompare(b.roundId, undefined, { numeric: true });
+      }
+      return b.roundId.localeCompare(a.roundId, undefined, { numeric: true });
+    });
+  }, [results, searchQuery, selectedSizeFilter, selectedColorFilter, sortOrder]);
 
-  const activeKeysCount = apiKeys.filter((k) => k.status === "active").length;
+  const totalPages = Math.ceil(filteredResults.length / pageSize) || 1;
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredResults.slice(start, start + pageSize);
+  }, [filteredResults, currentPage, pageSize]);
+
+  const handleCopy = (roundId: string) => {
+    navigator.clipboard.writeText(roundId);
+    setCopiedRoundId(roundId);
+    setTimeout(() => setCopiedRoundId(null), 2000);
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedRowIds.size === paginatedResults.length) {
+      setSelectedRowIds(new Set());
+    } else {
+      setSelectedRowIds(new Set(paginatedResults.map((r) => r.roundId)));
+    }
+  };
+
+  const handleToggleRow = (roundId: string) => {
+    const next = new Set(selectedRowIds);
+    if (next.has(roundId)) {
+      next.delete(roundId);
+    } else {
+      next.add(roundId);
+    }
+    setSelectedRowIds(next);
+  };
+
+  const handleExportCSV = () => {
+    if (results.length === 0) return;
+    const headers = ["Issue Number", "Number", "Size", "Color", "Settled Time", "Mode"];
+    const rows = results.map((r) => [
+      r.roundId,
+      r.number,
+      r.size,
+      `"${r.color}"`,
+      `"${r.timeFormatted}"`,
+      r.mode,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `popi-wingo-${selectedMode}-draws-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Sparkline generator helper
+  const sparklineBars = useMemo(() => {
+    return results.slice(0, 24).reverse().map((r, i) => {
+      const isRed = r.color.toLowerCase().includes("red");
+      const isGreen = r.color.toLowerCase().includes("green");
+      const heightPercent = 25 + (r.number * 7.5);
+      return {
+        key: i,
+        height: `${heightPercent}%`,
+        color: isRed ? "bg-rose-400 dark:bg-rose-500" : isGreen ? "bg-emerald-400 dark:bg-emerald-500" : "bg-purple-400",
+      };
+    });
+  }, [results]);
+
+  const bigPercentage = Math.round(((statistics.bigCount || 0) / (statistics.totalRecords || 1)) * 100);
+  const smallPercentage = 100 - bigPercentage;
+  const redPercentage = Math.round(((statistics.redCount || 0) / (statistics.totalRecords || 1)) * 100);
+  const greenPercentage = Math.round(((statistics.greenCount || 0) / (statistics.totalRecords || 1)) * 100);
+  const violetPercentage = Math.max(0, 100 - redPercentage - greenPercentage);
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-      {/* Admin God Mode Tactical Bar */}
-      {isAdmin && (
-        <div className="relative overflow-hidden p-4 sm:p-5 rounded-3xl bg-linear-to-r from-slate-900 via-slate-950 to-slate-900 border-2 border-amber-500/40 text-white shadow-xl">
-          <div className="absolute -right-6 -bottom-6 size-32 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="size-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
-                <Crown className="size-6 text-amber-400 animate-pulse" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black font-['Orbitron',sans-serif] tracking-wider text-amber-400">
-                    ADMIN GOD MODE ACTIVE
-                  </h3>
-                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-['Orbitron',sans-serif]">
-                    ALL FEATURES UNLOCKED
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 font-medium">
-                  38+ companion moods, zero-delay round feeds, rolling 100+ telemetry, and unrestricted admin controls.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onNavigatePage("admin")}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs font-['Orbitron',sans-serif] tracking-wide transition-all shadow-md cursor-pointer"
-              >
-                <ShieldAlert className="size-3.5" />
-                <span>Admin Command Suite</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigatePage("admin")}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs font-['Orbitron',sans-serif] border border-slate-700 transition-all cursor-pointer"
-              >
-                <span>Edit Live Plans & Prices</span>
-              </button>
+    <div className="space-y-6 animate-in fade-in duration-200 font-sans">
+      {/* 4 Crisp Square-Type Metric Cards (Exact structure of Reference Image 1 & 2) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* Card 1: Latest Settled Round Issue */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs flex flex-col justify-between space-y-3 transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              Latest Settled Issue
+            </span>
+            <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+              <Layers className="size-4 text-[#FF4625]" />
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Top 5 Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        {/* 1. Live Local Time */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest font-['Orbitron',sans-serif]">
-              Local Time
-            </span>
-            <Clock className="size-3.5 text-[#FF4625]" />
-          </div>
-          <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-mono">
-            {new Date().toLocaleTimeString("en-US", {
-              hour12: false,
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </div>
-          <p className="text-[10px] text-slate-400">Syncs every second</p>
-        </div>
-
-        {/* 2. Data Status */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest font-['Orbitron',sans-serif]">
-              Data Status
-            </span>
-            <Radio className="size-3.5 text-emerald-500" />
-          </div>
-          <div className="text-base sm:text-lg font-black text-emerald-500 font-['Orbitron',sans-serif]">
-            {connectionStatus}
-          </div>
-          <p className="text-[10px] text-slate-400">Low latency stream</p>
-        </div>
-
-        {/* 3. Latest Result */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest font-['Orbitron',sans-serif]">
-              Latest Result
-            </span>
-            <Zap className="size-3.5 text-[#FF4625]" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-['Orbitron',sans-serif]">
-              {latestResult ? latestResult.number : "--"}
-            </span>
-            {latestResult && (
-              <span
-                className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                  latestResult.size === "Big"
-                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                    : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"
-                }`}
-              >
-                {latestResult.size}
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="font-mono text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                {latestResult ? `#${latestResult.roundId.slice(-6)}` : "--"}
+              </div>
+              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                ↑ 100% Sync
               </span>
-            )}
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono truncate mt-0.5">
+              {latestResult ? latestResult.roundId : "Awaiting draw"}
+            </p>
           </div>
-          <p className="text-[10px] text-slate-400">
-            {latestResult?.color || "Awaiting draw"}
-          </p>
+
+          {/* Micro Sparkline Bar Chart at bottom (as in Image 1!) */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/70">
+            <div className="flex items-end gap-1 h-7 w-full overflow-hidden">
+              {sparklineBars.map((bar) => (
+                <div
+                  key={bar.key}
+                  className={`flex-1 rounded-xs transition-all duration-300 opacity-80 hover:opacity-100 ${bar.color}`}
+                  style={{ height: bar.height }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* 4. Results Today */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest font-['Orbitron',sans-serif]">
-              Records Cached
+        {/* Card 2: Size Parity (Big vs Small) */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs flex flex-col justify-between space-y-3 transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              Size Parity (Big vs Small)
             </span>
-            <Layers className="size-3.5 text-sky-500" />
+            <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+              <Scale className="size-4 text-amber-500" />
+            </div>
           </div>
-          <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-['Orbitron',sans-serif]">
-            {results.length} Rounds
+
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight font-['Orbitron',sans-serif]">
+                {bigPercentage}% Big
+              </div>
+              <span className="inline-flex items-center text-[10px] font-bold text-amber-600 dark:text-amber-400 font-mono">
+                {smallPercentage}% Small
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {statistics.bigCount} Big vs {statistics.smallCount} Small in last {statistics.totalRecords} draws
+            </p>
           </div>
-          <p className="text-[10px] text-slate-400">Full audit log</p>
+
+          {/* Segmented Dual Bar at bottom */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/70 space-y-1">
+            <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+              <div
+                className="h-full bg-amber-500 transition-all duration-500"
+                style={{ width: `${bigPercentage}%` }}
+              />
+              <div
+                className="h-full bg-indigo-500 transition-all duration-500"
+                style={{ width: `${smallPercentage}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <span className="text-amber-600 dark:text-amber-400 font-bold">Big (5-9)</span>
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold">Small (0-4)</span>
+            </div>
+          </div>
         </div>
 
-        {/* 5. Analysis Window */}
-        <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest font-['Orbitron',sans-serif]">
-              Analysis Window
+        {/* Card 3: Color Matrix & Dominance */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs flex flex-col justify-between space-y-3 transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              Dominant Color Matrix
             </span>
-            <BarChart2 className="size-3.5 text-[#FF4625]" />
+            <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+              <Palette className="size-4 text-rose-500" />
+            </div>
           </div>
-          <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-['Orbitron',sans-serif]">
-            Last 50
+
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight font-['Orbitron',sans-serif]">
+                {redPercentage >= greenPercentage ? "Red Flow" : "Green Flow"}
+              </div>
+              <span className="inline-flex items-center text-[10px] font-bold text-rose-600 dark:text-rose-400 font-mono">
+                {redPercentage}% R / {greenPercentage}% G
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Violet parity balance: {violetPercentage}% occurrence
+            </p>
           </div>
-          <p className="text-[10px] text-slate-400">Active sample</p>
+
+          {/* Tri-color Micro Bar */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/70 space-y-1">
+            <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+              <div
+                className="h-full bg-rose-500 transition-all duration-500"
+                style={{ width: `${redPercentage}%` }}
+              />
+              <div
+                className="h-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${greenPercentage}%` }}
+              />
+              <div
+                className="h-full bg-purple-500 transition-all duration-500"
+                style={{ width: `${violetPercentage}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <span className="text-rose-500 font-bold">Red ({statistics.redCount})</span>
+              <span className="text-emerald-500 font-bold">Grn ({statistics.greenCount})</span>
+              <span className="text-purple-400 font-bold">Vio</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Tactical Win Confidence Index */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs flex flex-col justify-between space-y-3 transition-all hover:border-slate-300 dark:hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              Tactical Confidence
+            </span>
+            <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+              <Target className="size-4 text-emerald-500" />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight font-['Orbitron',sans-serif]">
+                88.5% Index
+              </div>
+              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                ↑ High Signal
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Algorithmic momentum & reversion telemetry
+            </p>
+          </div>
+
+          {/* Progress bar */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/70 space-y-1">
+            <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div
+                className="h-full bg-linear-to-r from-emerald-500 to-teal-400 rounded-full"
+                style={{ width: "88.5%" }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <span>Volatility: Low</span>
+              <span className="text-emerald-500 font-bold">Optimal</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* POPI User Account & Firebase Realtime Database Usage Bar */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white relative overflow-hidden shadow-lg space-y-4 font-['Rajdhani',sans-serif]">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="size-12 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
-              {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || "User"}
-                  className="size-full object-cover"
-                />
+      {/* Live Spotlight & Settlement Countdown Banner (Square Card) */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          {/* Left: Settled Winning Number in Square Tile */}
+          <div className="lg:col-span-4 flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/70">
+            {/* Square Tile */}
+            <div
+              className={`size-16 sm:size-20 rounded-2xl flex items-center justify-center font-['Orbitron',sans-serif] text-3xl sm:text-4xl font-black text-white shadow-sm shrink-0 ${
+                latestResult?.color.includes("Red") && latestResult?.color.includes("Violet")
+                  ? "bg-linear-to-br from-rose-500 to-purple-600"
+                  : latestResult?.color.includes("Green") && latestResult?.color.includes("Violet")
+                  ? "bg-linear-to-br from-emerald-500 to-purple-600"
+                  : latestResult?.color.includes("Red")
+                  ? "bg-rose-500"
+                  : "bg-emerald-500"
+              }`}
+            >
+              {latestResult ? latestResult.number : "?"}
+            </div>
+
+            <div className="space-y-1 min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-['Orbitron',sans-serif]">
+                Settled Result
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase font-['Orbitron',sans-serif] ${
+                    latestResult?.size === "Big"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                      : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                  }`}
+                >
+                  {latestResult?.size} ({latestResult?.size === "Big" ? "5–9" : "0–4"})
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase font-['Orbitron',sans-serif] ${
+                    latestResult?.color.includes("Red")
+                      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  }`}
+                >
+                  {latestResult?.color}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                Issue #{latestResult ? latestResult.roundId : "--"}
+              </p>
+            </div>
+          </div>
+
+          {/* Center: Next Settlement Countdown */}
+          <div className="lg:col-span-5 space-y-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/70">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 dark:text-slate-300 font-['Orbitron',sans-serif]">
+                Next Round Settlement:
+              </span>
+              <span className="font-mono text-base font-black text-[#FF4625]">
+                {countdown.secondsLeft < 10 ? `0${countdown.secondsLeft}` : countdown.secondsLeft}s
+              </span>
+            </div>
+
+            <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div
+                className="h-full bg-linear-to-r from-[#FF4625] to-amber-500 transition-all duration-1000 ease-linear rounded-full"
+                style={{ width: `${countdown.percentRemaining}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+              <span>Mode: {selectedMode} draw cycle</span>
+              <span>Auto-refresh active</span>
+            </div>
+          </div>
+
+          {/* Right: Tactical Radar Suggestion */}
+          <div className="lg:col-span-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/70 space-y-2 text-center lg:text-left">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-['Orbitron',sans-serif]">
+              Tactical Signal
+            </span>
+            <div className="flex items-center justify-center lg:justify-start gap-2">
+              <span className="text-sm font-black font-['Orbitron',sans-serif] text-slate-900 dark:text-white">
+                {latestResult?.size === "Big" ? "SMALL (REVERT)" : "BIG (CONTINUE)"}
+              </span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-mono">
+                86%
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigatePage("live")}
+              className="inline-flex items-center gap-1 text-xs font-bold text-[#FF4625] hover:underline cursor-pointer"
+            >
+              <span>Inspect Live Stream</span>
+              <ArrowRight className="size-3" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Draw Results Table (Modeled directly after Reference Image 1 & 2!) */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-4">
+        {/* Table Top Controls Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2">
+          <div className="flex items-center gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                Draw Results & Telemetry
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Verified ar-lottery01 issues ({selectedMode === "30s" ? "WinGo 30S" : "WinGo 1M"})
+              </p>
+            </div>
+
+            {/* Cycle Selector Pills */}
+            <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
+              <button
+                type="button"
+                onClick={() => onSelectMode("30s")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer font-['Orbitron',sans-serif] ${
+                  selectedMode === "30s"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                30S
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectMode("1m")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer font-['Orbitron',sans-serif] ${
+                  selectedMode === "1m"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                1M
+              </button>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search issue or number..."
+                className="w-40 sm:w-52 pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden"
+              />
+            </div>
+
+            {/* Size Filter Pills */}
+            <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSizeFilter("ALL");
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                  selectedSizeFilter === "ALL"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSizeFilter("Big");
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                  selectedSizeFilter === "Big"
+                    ? "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-2xs font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                Big
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSizeFilter("Small");
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                  selectedSizeFilter === "Small"
+                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                Small
+              </button>
+            </div>
+
+            {/* Sort Toggle */}
+            <button
+              type="button"
+              onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700 cursor-pointer"
+              title="Sort Order"
+            >
+              <SlidersHorizontal className="size-3" />
+              <span className="hidden sm:inline">{sortOrder === "desc" ? "Newest" : "Oldest"}</span>
+            </button>
+
+            {/* Export CSV */}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
+              title="Export CSV Audit"
+            >
+              <Download className="size-3" />
+              <span>Export</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Clean Responsive Table (Like Reference Image 1 & 2) */}
+        <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="p-3.5 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedRowIds.size === paginatedResults.length && paginatedResults.length > 0}
+                    onChange={handleToggleSelectAll}
+                    className="rounded-sm border-slate-300 text-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                </th>
+                <th className="p-3.5">Issue Number</th>
+                <th className="p-3.5">Settled Time</th>
+                <th className="p-3.5 text-center">Number</th>
+                <th className="p-3.5">Size</th>
+                <th className="p-3.5">Color</th>
+                <th className="p-3.5">Status</th>
+                <th className="p-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium">
+              {paginatedResults.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-400 text-xs">
+                    No lottery draw records match your current filters.
+                  </td>
+                </tr>
               ) : (
-                <UserCheck className="size-6 text-[#FF4625]" />
+                paginatedResults.map((row) => {
+                  const isSelected = selectedRowIds.has(row.roundId);
+                  const isRed = row.color.toLowerCase().includes("red");
+                  const isGreen = row.color.toLowerCase().includes("green");
+                  const isViolet = row.color.toLowerCase().includes("violet");
+
+                  return (
+                    <tr
+                      key={row.roundId}
+                      className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors ${
+                        isSelected ? "bg-slate-50 dark:bg-slate-800/30" : ""
+                      }`}
+                    >
+                      <td className="p-3.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleRow(row.roundId)}
+                          className="rounded-sm border-slate-300 text-slate-900 focus:ring-0 cursor-pointer"
+                        />
+                      </td>
+
+                      {/* Issue Number */}
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-1.5 font-mono text-slate-900 dark:text-white font-semibold">
+                          <span>{row.roundId}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(row.roundId)}
+                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                            title="Copy Issue Number"
+                          >
+                            {copiedRoundId === row.roundId ? (
+                              <Check className="size-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="size-3" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Settled Time */}
+                      <td className="p-3.5 font-mono text-slate-500 dark:text-slate-400">
+                        {row.timeFormatted}
+                      </td>
+
+                      {/* Number Badge (Square badge with color) */}
+                      <td className="p-3.5 text-center">
+                        <span
+                          className={`size-7 rounded-lg inline-flex items-center justify-center font-['Orbitron',sans-serif] text-xs font-black text-white shadow-2xs ${
+                            isRed && isViolet
+                              ? "bg-linear-to-br from-rose-500 to-purple-600"
+                              : isGreen && isViolet
+                              ? "bg-linear-to-br from-emerald-500 to-purple-600"
+                              : isRed
+                              ? "bg-rose-500"
+                              : "bg-emerald-500"
+                          }`}
+                        >
+                          {row.number}
+                        </span>
+                      </td>
+
+                      {/* Size Tag (Pastel pill tag) */}
+                      <td className="p-3.5">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                            row.size === "Big"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              : "bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+                          }`}
+                        >
+                          {row.size} ({row.size === "Big" ? "5-9" : "0-4"})
+                        </span>
+                      </td>
+
+                      {/* Color Tag */}
+                      <td className="p-3.5">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                            isRed && isViolet
+                              ? "bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20"
+                              : isGreen && isViolet
+                              ? "bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20"
+                              : isRed
+                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          }`}
+                        >
+                          {row.color}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold font-mono">
+                          <span className="size-1.5 rounded-full bg-emerald-500" />
+                          Confirmed
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="p-3.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(row.roundId)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <MoreVertical className="size-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Bar (Exact structure of Reference Image 1 & 2) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs text-slate-500 dark:text-slate-400">
+          <div>
+            Showing{" "}
+            <span className="font-bold text-slate-900 dark:text-white">
+              {filteredResults.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-bold text-slate-900 dark:text-white">
+              {Math.min(currentPage * pageSize, filteredResults.length)}
+            </span>{" "}
+            of{" "}
+            <span className="font-bold text-slate-900 dark:text-white">
+              {filteredResults.length}
+            </span>{" "}
+            results
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Page Size Selector */}
+            <div className="flex items-center gap-1.5">
+              <span>Per page</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="py-1 px-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+
+            {/* Prev / Next Pagination Numbers */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronLeft className="size-3.5" />
+              </button>
+
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = i + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`size-7 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      currentPage === pageNum
+                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-950"
+                        : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Account & Storage Strip (Square Container) */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200">
+              <UserCheck className="size-5 text-[#FF4625]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-['Orbitron',sans-serif] font-black text-sm text-white">
+                <span className="font-bold text-sm text-slate-900 dark:text-white">
                   {profile?.displayName || user?.displayName || "POPI Gamer"}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold font-mono">
-                  {(profile as any)?.status || (profile?.bannedAt ? "SUSPENDED" : "ACTIVE")}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-[#FF4625]/20 text-[#FF4625] text-[10px] font-bold font-['Orbitron',sans-serif]">
-                  {isAdmin ? "GOD MODE" : `${planInfo.name} Plan (₹${planInfo.price})`}
+                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold font-mono">
+                  {isAdmin ? "ADMIN" : `${planInfo.name.toUpperCase()} PLAN`}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 {user?.email || "Connected via Firebase Authentication"}
               </p>
             </div>
           </div>
 
-          {/* Quick Action Navigation Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onNavigatePage("uploads")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer"
             >
-              <UploadCloud className="size-3.5 text-emerald-400" />
-              <span>Script Uploads</span>
+              <UploadCloud className="size-3.5 text-emerald-500" />
+              <span>Algorithm Vault</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigatePage("api-keys")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer"
             >
-              <Key className="size-3.5 text-[#FF4625]" />
-              <span>API Keys ({activeKeysCount})</span>
+              <Key className="size-3.5 text-indigo-500" />
+              <span>API Keys</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigatePage("subscription")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-linear-to-r from-[#FF4625] to-amber-500 text-white text-xs font-black font-['Orbitron',sans-serif] hover:opacity-90 cursor-pointer transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FF4625] hover:bg-[#E03A1B] text-white text-xs font-bold cursor-pointer transition-all shadow-xs"
             >
               <CreditCard className="size-3.5" />
               <span>Manage Plan</span>
             </button>
           </div>
-        </div>
-
-        {/* Real-time Usage Metrics Strip */}
-        <div className="pt-3 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-mono">
-              <span>WEEKLY SCRIPT UPLOADS</span>
-              <UploadCloud className="size-3 text-emerald-400" />
-            </div>
-            <div className="font-['Orbitron',sans-serif] font-bold text-sm text-white">
-              {usage.uploadCount} / {isAdmin ? "Unlimited" : weeklyQuota}
-            </div>
-            <div className="text-[10px] text-emerald-400">
-              {isAdmin ? "God Mode (No Limits)" : `${usage.remainingUploads} remaining this week`}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-mono">
-              <span>DEVELOPER API KEYS</span>
-              <Key className="size-3 text-[#FF4625]" />
-            </div>
-            <div className="font-['Orbitron',sans-serif] font-bold text-sm text-white">
-              {activeKeysCount} Active Key{activeKeysCount !== 1 ? "s" : ""}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Encrypted Realtime Database storage
-            </div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-mono">
-              <span>SUBSCRIPTION STATUS</span>
-              <Sparkles className="size-3 text-amber-400" />
-            </div>
-            <div className="font-['Orbitron',sans-serif] font-bold text-sm text-amber-400">
-              {isAdmin ? "GOD MODE VIP" : `${planInfo.name.toUpperCase()} (₹${planInfo.price})`}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              {isAdmin ? "Infinite lifetime license" : "Auto-synced with Firebase"}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Overview Card: Live Results Monitor */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm relative overflow-hidden space-y-6">
-        {/* Subtle decorative background circuit */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-[#FF4625]/5 blur-3xl"
-        />
-
-        {/* Card Header: Title & Mode Switcher */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
-              <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white font-['Orbitron',sans-serif] tracking-wider">
-                Live Results Monitor
-              </h2>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                LIVE
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Deterministic historical draw monitor. Displays settled numbers, size, and color parity.
-            </p>
-          </div>
-
-          {/* Mode Switcher Pill */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => onSelectMode("30s")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer font-['Orbitron',sans-serif] ${
-                selectedMode === "30s"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              30 Seconds
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectMode("1m")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer font-['Orbitron',sans-serif] ${
-                selectedMode === "1m"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              1 Minute
-            </button>
-          </div>
-        </div>
-
-        {/* Big Live Result Display Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center pt-2 relative z-10">
-          {/* Main Settled Result Spotlight */}
-          <div className="md:col-span-5 p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col items-center justify-center text-center space-y-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400 font-['Orbitron',sans-serif]">
-              Settled Round Result
-            </span>
-
-            {/* Giant Number Indicator */}
-            <div className="relative">
-              <div
-                className={`size-24 sm:size-28 rounded-3xl flex items-center justify-center font-['Orbitron',sans-serif] text-5xl sm:text-6xl font-black shadow-lg transition-transform duration-300 hover:scale-105 ${
-                  latestResult?.color.includes("Red") &&
-                  latestResult?.color.includes("Violet")
-                    ? "bg-gradient-to-br from-rose-500 to-purple-600 text-white"
-                    : latestResult?.color.includes("Green") &&
-                      latestResult?.color.includes("Violet")
-                    ? "bg-gradient-to-br from-emerald-500 to-purple-600 text-white"
-                    : latestResult?.color.includes("Red")
-                    ? "bg-rose-500 text-white"
-                    : "bg-emerald-500 text-white"
-                }`}
-              >
-                {latestResult ? latestResult.number : "?"}
-              </div>
-            </div>
-
-            {/* Size & Color Classification Badges */}
-            <div className="flex items-center gap-2 pt-1">
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider font-['Orbitron',sans-serif] ${
-                  latestResult?.size === "Big"
-                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                    : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30"
-                }`}
-              >
-                {latestResult?.size || "--"} (
-                {latestResult?.size === "Big" ? "5–9" : "0–4"})
-              </span>
-
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider font-['Orbitron',sans-serif] ${
-                  latestResult?.color.includes("Red") &&
-                  latestResult?.color.includes("Violet")
-                    ? "bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30"
-                    : latestResult?.color.includes("Green") &&
-                      latestResult?.color.includes("Violet")
-                    ? "bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30"
-                    : latestResult?.color === "Red"
-                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
-                    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                }`}
-              >
-                {latestResult?.color || "--"}
-              </span>
-            </div>
-          </div>
-
-          {/* Round Metadata & Countdown Timer */}
-          <div className="md:col-span-7 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-1">
-                <span className="text-[10px] uppercase font-bold text-slate-400 font-['Orbitron',sans-serif]">
-                  Current Round ID
-                </span>
-                <div className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                  {latestResult?.roundId || "--"}
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-1">
-                <span className="text-[10px] uppercase font-bold text-slate-400 font-['Orbitron',sans-serif]">
-                  Settlement Time
-                </span>
-                <div className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                  {latestResult?.timeFormatted || "--"}
-                </div>
-              </div>
-            </div>
-
-            {/* Next Round Progress Bar */}
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-600 dark:text-slate-300 font-['Orbitron',sans-serif]">
-                  Next Round Settlement In:
-                </span>
-                <span className="font-mono font-bold text-[#FF4625]">
-                  {countdown.secondsLeft}s
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#FF4625] to-orange-400 transition-all duration-1000 ease-linear rounded-full"
-                  style={{ width: `${countdown.percentRemaining}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-slate-400">
-                <span>Mode: {selectedMode} draw cycle</span>
-                <span>Auto-refresh active</span>
-              </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={isRefreshing}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 font-['Orbitron',sans-serif]"
-              >
-                <RefreshCw
-                  className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-                />
-                <span>Sync Now</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigatePage("live")}
-                className="inline-flex items-center gap-1 text-xs font-bold text-[#FF4625] hover:underline cursor-pointer"
-              >
-                <span>Full Live Feed</span>
-                <ArrowRight className="size-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Sequence Preview Bar */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="size-4 text-[#FF4625]" />
-            <h3 className="font-['Orbitron',sans-serif] text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-              Recent 10 Draw Sequence
-            </h3>
-          </div>
-          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-            Chronological Flow
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {statistics.recentSequence.map((item, idx) => (
-            <div
-              key={idx}
-              className="shrink-0 flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 min-w-[54px]"
-            >
-              <span
-                className={`size-7 rounded-lg flex items-center justify-center text-xs font-black text-white font-['Orbitron',sans-serif] ${
-                  item.color.includes("Red") ? "bg-rose-500" : "bg-emerald-500"
-                }`}
-              >
-                {item.number}
-              </span>
-              <span
-                className={`text-[9px] font-bold uppercase ${
-                  item.size === "Big" ? "text-amber-500" : "text-indigo-500"
-                }`}
-              >
-                {item.size}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Mini Quick History Table & Shortcut Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Quick 5 Table */}
-        <div className="lg:col-span-8 p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-['Orbitron',sans-serif] text-sm font-bold text-slate-900 dark:text-white">
-              Latest Settled Rounds
-            </h3>
-            <button
-              type="button"
-              onClick={() => onNavigatePage("history")}
-              className="text-xs text-[#FF4625] font-bold hover:underline cursor-pointer"
-            >
-              View All History &rarr;
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-['Rajdhani',sans-serif]">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase font-bold text-slate-400 font-['Orbitron',sans-serif]">
-                  <th className="pb-2.5">Round ID</th>
-                  <th className="pb-2.5">Number</th>
-                  <th className="pb-2.5">Size</th>
-                  <th className="pb-2.5">Color</th>
-                  <th className="pb-2.5">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                {results.slice(0, 5).map((r) => (
-                  <tr
-                    key={r.roundId}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
-                  >
-                    <td className="py-2.5 font-mono font-bold text-slate-900 dark:text-white">
-                      {r.roundId}
-                    </td>
-                    <td className="py-2.5">
-                      <span
-                        className={`size-6 rounded-md inline-flex items-center justify-center font-bold font-['Orbitron',sans-serif] text-white ${
-                          r.color.includes("Red")
-                            ? "bg-rose-500"
-                            : "bg-emerald-500"
-                        }`}
-                      >
-                        {r.number}
-                      </span>
-                    </td>
-                    <td className="py-2.5">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          r.size === "Big"
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                        }`}
-                      >
-                        {r.size}
-                      </span>
-                    </td>
-                    <td className="py-2.5 font-medium text-slate-600 dark:text-slate-300">
-                      {r.color}
-                    </td>
-                    <td className="py-2.5 text-slate-400 font-mono">
-                      {r.timeFormatted}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Quick Analytical Breakdown Card */}
-        <div className="lg:col-span-4 p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-2xs space-y-4 flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-['Orbitron',sans-serif] text-sm font-bold text-slate-900 dark:text-white">
-                Distribution Quick View
-              </h3>
-              <span className="text-[10px] text-slate-400">Past 50</span>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div>
-                <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  <span>Big ({statistics.bigCount})</span>
-                  <span>Small ({statistics.smallCount})</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-indigo-500 overflow-hidden flex">
-                  <div
-                    className="h-full bg-amber-500"
-                    style={{
-                      width: `${
-                        (statistics.bigCount /
-                          (statistics.totalRecords || 1)) *
-                        100
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  <span>Red ({statistics.redCount})</span>
-                  <span>Green ({statistics.greenCount})</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-emerald-500 overflow-hidden flex">
-                  <div
-                    className="h-full bg-rose-500"
-                    style={{
-                      width: `${
-                        (statistics.redCount /
-                          (statistics.totalRecords || 1)) *
-                        100
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigatePage("analysis")}
-            className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-900 dark:text-white transition-all cursor-pointer font-['Orbitron',sans-serif]"
-          >
-            <BarChart2 className="size-3.5 text-[#FF4625]" />
-            <span>Open Deep Analytics</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Real-Time Firebase Stream & Community Lounge Banner */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-linear-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 text-white relative overflow-hidden shadow-lg">
-        <div className="absolute right-0 top-0 w-80 h-full bg-linear-to-l from-emerald-500/10 to-transparent pointer-events-none" />
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="size-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-              <Radio className="size-6 animate-pulse" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-black font-['Orbitron',sans-serif] tracking-wider text-white">
-                  Cloud Firestore Real-Time Stream
-                </h3>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold font-mono">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  CONNECTED
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-medium">
-                Live draw broadcasts, multi-device sync, and community gamer prediction lounge.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigatePage("realtime")}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-[#FF4625] to-amber-500 hover:opacity-90 text-white font-black text-xs font-['Orbitron',sans-serif] tracking-wide transition-all shadow-md cursor-pointer self-start sm:self-auto"
-          >
-            <span>Open Realtime Lounge</span>
-            <ArrowRight className="size-4" />
-          </button>
         </div>
       </div>
     </div>

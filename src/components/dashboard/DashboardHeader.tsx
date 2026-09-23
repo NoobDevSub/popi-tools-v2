@@ -7,15 +7,13 @@ import {
   RefreshCw,
   Clock,
   Radio,
-  CheckCircle2,
-  AlertTriangle,
   X,
-  ExternalLink,
-  ChevronDown,
-  Crown,
   ShieldAlert,
-  ArrowLeft,
   Menu,
+  Search,
+  CheckCircle2,
+  Download,
+  Filter,
 } from "lucide-react";
 
 interface DashboardHeaderProps {
@@ -33,6 +31,7 @@ interface DashboardHeaderProps {
   onExitDashboard?: () => void;
   onOpenProfile?: () => void;
   onToggleMobileMenu?: () => void;
+  onSearchClick?: () => void;
 }
 
 export function DashboardHeader({
@@ -50,6 +49,7 @@ export function DashboardHeader({
   onExitDashboard,
   onOpenProfile,
   onToggleMobileMenu,
+  onSearchClick,
 }: DashboardHeaderProps) {
   const [currentTime, setCurrentTime] = useState<string>("");
   const [timeZone, setTimeZone] = useState<string>("");
@@ -57,27 +57,27 @@ export function DashboardHeader({
   const [notifications, setNotifications] = useState([
     {
       id: "1",
-      title: "Tactical Engine Synchronized",
-      message: "Real-time 30s and 1m result channels are streaming at 100% fidelity.",
+      title: "Tactical Engine Live",
+      message: "Directly connected to ar-lottery01 WinGo 30S & 1M telemetry streams.",
       time: "Just now",
       read: false,
     },
     {
       id: "2",
-      title: "PRO Subscription Active",
-      message: "All 38+ POPI companion moods & advanced historical analytics unlocked.",
+      title: "PRO Plan Active",
+      message: "High-frequency analysis models and historical draw archive enabled.",
       time: "1h ago",
       read: false,
     },
   ]);
 
-  // Live dynamic clock updated every second (strictly not hardcoded)
+  // Live dynamic clock updated every second
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setCurrentTime(
         now.toLocaleTimeString("en-US", {
-          hour12: true,
+          hour12: false,
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
@@ -103,87 +103,99 @@ export function DashboardHeader({
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 py-2.5 sm:py-3 transition-colors">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
-        {/* Left: Hamburger menu (mobile) */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Mobile Drawer Hamburger Button */}
+    <header className="sticky top-0 z-30 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-4 sm:px-6 lg:px-8 py-3 transition-colors font-sans">
+      <div className="flex items-center justify-between gap-4">
+        {/* Left Side: Mobile Hamburger + Page Title & Breadcrumb */}
+        <div className="flex items-center gap-3 min-w-0">
           {onToggleMobileMenu && (
             <button
               type="button"
               onClick={onToggleMobileMenu}
-              className="lg:hidden p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shrink-0"
+              className="lg:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shrink-0"
               title="Open navigation menu"
               aria-label="Open menu"
             >
-              <Menu className="size-4 text-slate-700 dark:text-slate-200" />
+              <Menu className="size-4" />
             </button>
           )}
+
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
+              {title}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block truncate">
+              {description}
+            </p>
+          </div>
         </div>
 
-        {/* Right: Live Connection Indicator, Dynamic Clock, Admin Jump, Refresh, Notifications, Profile */}
-        <div className="flex items-center flex-wrap sm:flex-nowrap gap-2 justify-end">
-          {/* Quick Admin Command Shortcut */}
+        {/* Center: Global Search Bar (like Image 1, 2, 5, 7) */}
+        <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
+          <div className="relative w-full">
+            <Search className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search draw rounds, issue IDs, algorithms..."
+              onClick={onSearchClick}
+              className="w-full pl-10 pr-12 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600 transition-all"
+            />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[10px] text-slate-500 dark:text-slate-300 font-mono shadow-2xs">
+              ⌘K
+            </kbd>
+          </div>
+        </div>
+
+        {/* Right Side: Telemetry pill, Clock, Actions, Notifications & Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Admin Command Shortcut */}
           {isAdmin && onNavigateAdmin && (
             <button
               type="button"
               onClick={onNavigateAdmin}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF4625] hover:bg-[#E03A1B] text-white text-xs font-bold font-['Orbitron',sans-serif] transition-colors cursor-pointer shrink-0"
-              title="Open Admin Command Center (Manage Users & Subscriptions)"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FF4625] hover:bg-[#E03A1B] text-white text-xs font-bold font-['Orbitron',sans-serif] transition-all cursor-pointer shadow-xs"
+              title="Admin Command Suite"
             >
               <ShieldAlert className="size-3.5" />
               <span className="hidden sm:inline">Admin</span>
             </button>
           )}
 
-          {/* Live Dynamic Clock */}
+          {/* Real-time Status Badge */}
           <div
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-mono font-medium shrink-0"
-            title={`Current local time (${timeZone})`}
-          >
-            <Clock className="size-3.5 text-[#FF4625] shrink-0" />
-            <span className="font-semibold">{currentTime || "--:--:--"}</span>
-            <span className="text-[10px] text-slate-400 hidden xl:inline">({timeZone})</span>
-          </div>
-
-          {/* Connection Status Pill */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold tracking-wider uppercase font-['Orbitron',sans-serif] shrink-0 ${
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold tracking-wider font-mono ${
               connectionStatus === "CONNECTED"
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                 : connectionStatus === "UPDATING"
-                ? "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800"
-                : connectionStatus === "STALE"
-                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800"
-                : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800"
+                ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
             }`}
-            title={`Data status: ${connectionStatus}`}
           >
             <span
-              className={`size-2 rounded-full shrink-0 ${
+              className={`size-2 rounded-full ${
                 connectionStatus === "CONNECTED"
-                  ? "bg-emerald-500"
-                  : connectionStatus === "UPDATING"
-                  ? "bg-sky-500"
-                  : connectionStatus === "STALE"
-                  ? "bg-amber-500"
-                  : "bg-rose-500"
+                  ? "bg-emerald-500 animate-pulse"
+                  : "bg-amber-500"
               }`}
             />
-            <span className="hidden xs:inline">{connectionStatus}</span>
+            <span>{connectionStatus}</span>
           </div>
 
-          {/* Refresh Action */}
+          {/* Dynamic Real-time Clock */}
+          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">
+            <Clock className="size-3.5 text-[#FF4625]" />
+            <span>{currentTime || "--:--:--"}</span>
+          </div>
+
+          {/* Sync / Refresh Button */}
           <button
             type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-            title="Refresh latest results"
-            aria-label="Refresh results"
+            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+            title="Sync latest live draw results"
           >
             <RefreshCw
-              className={`size-3.5 ${isRefreshing ? "animate-spin text-[#FF4625]" : ""}`}
+              className={`size-4 ${isRefreshing ? "animate-spin text-[#FF4625]" : ""}`}
             />
           </button>
 
@@ -192,11 +204,10 @@ export function DashboardHeader({
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              className="relative p-2 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               title="Notifications"
-              aria-label="View notifications"
             >
-              <Bell className="size-3.5" />
+              <Bell className="size-4" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 size-4 rounded-full bg-[#FF4625] text-white text-[9px] font-black flex items-center justify-center">
                   {unreadCount}
@@ -204,17 +215,16 @@ export function DashboardHeader({
               )}
             </button>
 
-            {/* Notification Drawer Popover */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-3 z-50 animate-in fade-in">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-3 z-50 animate-in fade-in">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <Bell className="size-4 text-[#FF4625]" />
                     <span className="text-xs font-bold font-['Orbitron',sans-serif] text-slate-900 dark:text-white">
                       Notifications
                     </span>
                     {unreadCount > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#FF4625]/15 text-[#FF4625] font-bold">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF4625]/15 text-[#FF4625] font-bold">
                         {unreadCount} new
                       </span>
                     )}
@@ -226,15 +236,15 @@ export function DashboardHeader({
                         onClick={markAllAsRead}
                         className="text-[10px] text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                       >
-                        Mark read
+                        Mark all read
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => setShowNotifications(false)}
-                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-4" />
                     </button>
                   </div>
                 </div>
@@ -243,7 +253,7 @@ export function DashboardHeader({
                   {notifications.map((n) => (
                     <div
                       key={n.id}
-                      className={`p-2.5 rounded-lg text-xs space-y-1 transition-colors ${
+                      className={`p-2.5 rounded-xl text-xs space-y-1 transition-colors ${
                         !n.read
                           ? "bg-slate-50 dark:bg-slate-800/50"
                           : "opacity-75"
@@ -271,32 +281,28 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={onOpenProfile}
-            className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs"
             title="Open User Profile"
           >
             {userPhoto ? (
               <img
                 src={userPhoto}
                 alt={userDisplayName}
-                className="size-6 rounded-md object-cover"
+                className="size-7 rounded-lg object-cover"
               />
             ) : (
-              <div className="size-6 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-black">
+              <div className="size-7 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-black">
                 {userDisplayName.charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="text-xs font-bold text-slate-900 dark:text-white hidden lg:inline max-w-[100px] truncate">
-              {userDisplayName}
-            </span>
-            {isAdmin ? (
-              <span className="text-[9px] uppercase font-black tracking-wider px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-['Orbitron',sans-serif]">
-                GOD MODE
-              </span>
-            ) : (
-              <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-[#FF4625] text-white">
-                {plan}
-              </span>
-            )}
+            <div className="text-left hidden lg:block">
+              <div className="text-xs font-bold text-slate-900 dark:text-white max-w-[110px] truncate leading-tight">
+                {userDisplayName}
+              </div>
+              <div className="text-[10px] text-slate-400 leading-none mt-0.5">
+                {isAdmin ? "Admin User" : `${plan} Plan`}
+              </div>
+            </div>
           </button>
         </div>
       </div>
