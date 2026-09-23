@@ -11,8 +11,9 @@ import {
   recordActivity,
   incrementSessionCount,
 } from "../../services/resultsService";
-import { Sidebar, DashboardPage } from "./Sidebar";
+import { DashboardPage, Sidebar } from "./Sidebar";
 import { DashboardHeader } from "./DashboardHeader";
+import { DashboardBackground } from "./DashboardBackground";
 import { DashboardOverview } from "./pages/DashboardOverview";
 import { LiveResultsPage } from "./pages/LiveResultsPage";
 import { RealtimeLoungePage } from "./pages/RealtimeLoungePage";
@@ -357,7 +358,10 @@ export function DashboardShell({
   }
 
   return (
-    <div className="min-h-screen w-full flex bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-[#FF4625] selection:text-white">
+    <div className="min-h-screen w-full flex bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-[#FF4625] selection:text-white relative">
+      {/* Ambient Radial Glow Background UI */}
+      <DashboardBackground glowColor="emerald" />
+
       {/* 1. Left Sidebar (Desktop & Mobile Drawer) */}
       <Sidebar
         activePage={activePage}
@@ -379,7 +383,7 @@ export function DashboardShell({
       />
 
       {/* 2. Main Center/Right Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-8">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-8 relative z-10">
         {/* Top Header */}
         <DashboardHeader
           title={pageMeta[activePage].title}

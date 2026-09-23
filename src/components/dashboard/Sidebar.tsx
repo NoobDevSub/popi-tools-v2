@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { PopiLogo } from "../PopiLogo";
 import {
   LayoutDashboard,
   Radio,
@@ -183,11 +184,9 @@ export function Sidebar({
         {/* Brand Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
           <div className="flex items-center gap-3">
-            {/* Square Geometric Logo Icon */}
-            <div className="size-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 flex items-center justify-center shadow-xs shrink-0">
-              <span className="font-['Orbitron',sans-serif] font-black text-base tracking-tight text-[#FF4625]">
-                P
-              </span>
+            {/* Square Geometric Logo Icon with User Logo */}
+            <div className="size-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center shadow-2xs shrink-0">
+              <PopiLogo className="size-6 shrink-0" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">

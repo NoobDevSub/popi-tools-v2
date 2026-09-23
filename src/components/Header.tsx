@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTelegramGate } from "../context/TelegramGateContext";
 import { UserAccountModal } from "./UserAccountModal";
 import { AuthModal } from "./auth/AuthModal";
+import { PopiLogo } from "./PopiLogo";
 import { User, Crown, LayoutDashboard, LogIn } from "lucide-react";
 
 interface HeaderProps {
@@ -48,11 +49,8 @@ export function Header({ onOpenDashboard }: HeaderProps) {
             href="#"
             className="flex items-center gap-2 sm:gap-2.5 text-slate-900 dark:text-white group focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg shrink-0"
           >
-            {/* Mini POPI icon mark */}
-            <div className="size-7 sm:size-8 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center gap-1 transition-transform duration-200 group-hover:scale-105 shrink-0">
-              <div className="size-1.5 sm:size-2 rounded-xs bg-white dark:bg-slate-900" />
-              <div className="size-1.5 sm:size-2 rounded-xs bg-white dark:bg-slate-900" />
-            </div>
+            {/* Official POPI brand logo */}
+            <PopiLogo className="size-7 sm:size-8 transition-transform duration-200 group-hover:scale-105 shrink-0" />
             <span className="font-['Orbitron',sans-serif] text-base sm:text-2xl font-black tracking-widest text-slate-900 dark:text-white">
               POPI
             </span>

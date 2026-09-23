@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { PopiLogo } from "./PopiLogo";
 import { MetalButton } from "@/components/ui/metal-button";
 import { LEGAL_CONFIG } from "../config/legalConfig";
 
@@ -50,11 +51,8 @@ export function Footer({ onOpenLegal, onNavigateHome, onOpenDashboard }: FooterP
           {/* Brand Col */}
           <div className="sm:col-span-2 md:col-span-4 space-y-4">
             <div className="flex items-center gap-2.5">
-              {/* Mini POPI icon mark */}
-              <div className="size-8 rounded-xl bg-white flex items-center justify-center gap-1 shadow-sm">
-                <div className="size-2 rounded-xs bg-slate-950" />
-                <div className="size-2 rounded-xs bg-slate-950" />
-              </div>
+              {/* Official POPI brand logo */}
+              <PopiLogo className="size-8 shrink-0" />
               <span className="font-['Orbitron',sans-serif] text-2xl font-black tracking-widest text-white">
                 POPI Tools
               </span>
